@@ -112,37 +112,41 @@ def find_collision(current_pos, direction, candidate_points, r):
     A = current_pos
     d = direction
     
-    min_t = float('inf')
-    collision_point = None
+    # Vectorized calculations
+    Ap = A - candidate_points  # Shape: (n, 3)
+    b = 2.0 * np.dot(Ap, d)    # Shape: (n,)
+    c = np.sum(Ap**2, axis=1) - r*r  # Shape: (n,)
     
-    for i in range(len(candidate_points)):
-        point = candidate_points[i]
-        Ap = A - point
-        
-        # Calculate b and c
-        b = 2.0 * (Ap[0]*d[0] + Ap[1]*d[1] + Ap[2]*d[2])
-        c = (Ap[0]**2 + Ap[1]**2 + Ap[2]**2) - r*r
-        
-        # Calculate discriminant
-        discriminant = b**2 - 4*c
-        
-        if discriminant >= 0:
-            sqrt_disc = discriminant**0.5
-            t1 = (-b - sqrt_disc) / 2
-            t2 = (-b + sqrt_disc) / 2
-            
-            # Find the smallest positive t
-            current_t = float('inf')
-            if t1 > 0:
-                current_t = t1
-            if t2 > 0 and t2 < current_t:
-                current_t = t2
-            
-            if current_t < min_t:
-                min_t = current_t
-                collision_point = point
+    # Calculate discriminant
+    discriminant = b**2 - 4*c  # Shape: (n,)
     
-    return collision_point, min_t
+    # Identify valid collisions (discriminant >= 0)
+    valid_mask = discriminant >= 0
+    if not np.any(valid_mask):
+        return None, float('inf')
+    
+    # Filter valid candidates
+    valid_b = b[valid_mask]
+    valid_c = c[valid_mask]
+    valid_discriminant = discriminant[valid_mask]
+    valid_points = candidate_points[valid_mask]
+    
+    # Vectorized root calculations
+    sqrt_disc = np.sqrt(valid_discriminant)
+    t1 = (-valid_b - sqrt_disc) / 2
+    t2 = (-valid_b + sqrt_disc) / 2
+    
+    # Find positive roots and determine minimum t
+    positive_roots = np.where((t1 > 0) | (t2 > 0), 
+                               np.where((t1 > 0) & (t2 > 0), 
+                                        np.minimum(t1, t2),
+                                        np.where(t1 > 0, t1, t2)),
+                               np.inf)
+    
+    min_idx = np.argmin(positive_roots)
+    min_t = positive_roots[min_idx]
+    
+    return valid_points[min_idx], min_t
 
 def sigmoid(x, width_coef=1):
     return 1 / (1 + np.exp(-(8/width_coef)*(x))) # width_coef=1 means the width of the sigmoid effective range is 1
@@ -202,3 +206,59 @@ def get_uniqueness_score(input_vector, set_vectors):
     # print(f"distances_to_input: {avg_dist_input}, avg_dist_centroid: {avg_dist_centroid}")
     
     return uniqueness_score
+
+def get_diffusion_probability(min_path_len, max_path_len, path_len):
+    diff = max_path_len - min_path_len
+    prob = -sigmoid(path_len-(min_path_len+diff/4), width_coef=diff)+1
+    return prob
+
+class FixedSizeArray:
+    def __init__(self, max_size):
+        if max_size < 0:
+            raise ValueError("max_size must be >= 0")
+        self.max_size = max_size
+        self._data = [None] * max_size  # Fixed-size internal storage
+        self._size = 0  # Current number of elements (can be < max_size)
+
+    def append(self, item):
+        if self._size >= self.max_size:
+            raise IndexError(f"Cannot append: FixedSizeArray is full (max_size={self.max_size})")
+        self._data[self._size] = item
+        self._size += 1
+
+    def pop(self):
+        if self._size == 0:
+            raise IndexError("pop from empty FixedSizeArray")
+        self._size -= 1
+        item = self._data[self._size]
+        self._data[self._size] = None  # Optional cleanup
+        return item
+
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            # Handle slicing (optional but useful)
+            return self._data[:self._size][index]
+        if index < 0:
+            index += self._size
+        if index < 0 or index >= self._size:
+            raise IndexError(f"Index {index} out of range for size {self._size}")
+        return self._data[index]
+
+    def __setitem__(self, index, value):
+        if isinstance(index, slice):
+            raise NotImplementedError("Slicing assignment not supported")
+        if index < 0:
+            index += self._size
+        if index < 0 or index >= self._size:
+            raise IndexError(f"Index {index} out of range for size {self._size}")
+        self._data[index] = value
+
+    def __len__(self):
+        return self._size
+
+    def __repr__(self):
+        return f"FixedSizeArray({self._data[:self._size]}, max_size={self.max_size})"
+
+    # Optional: support iteration
+    def __iter__(self):
+        return iter(self._data[:self._size])

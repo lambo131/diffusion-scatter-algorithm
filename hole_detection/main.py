@@ -21,14 +21,22 @@ class PLYManager:
     '''
 
     def __init__(self, object_file_name, origin_point=[0, 0, 0], print_info=True):
+        self.origin_point = origin_point # first ball spawn origin
+        self.object_file_name = object_file_name
+    
         self.inner_pcd = None
         self.outer_pcd = None
         self.combined = None
         self.points = None
-        self.origin_point = origin_point # first ball spawn origin
-        self.object_file_name = object_file_name
+
         self.load_ply(print_info)
         self.points = np.asarray(self.combined.points)
+        if self.inner_pcd is not None and self.outer_pcd is not None:
+            inpoints = np.asarray(self.inner_pcd.points)  # shape (M, 3)
+            self.inpoints_set = {tuple(point) for point in inpoints}
+            outpoints = np.asarray(self.outer_pcd.points)  # shape (M, 3)
+            self.outpoints_set = {tuple(point) for point in outpoints}
+
         self.kdtree = o3d.geometry.KDTreeFlann(self.combined)
 
         self.centroid = np.mean(self.points, axis=0)
@@ -37,7 +45,7 @@ class PLYManager:
         self.bbox = self.combined.get_axis_aligned_bounding_box()
         self.bbox_center = (min_bound + max_bound) / 2
         self.bbox_diagonal = np.linalg.norm(np.asarray(self.bbox.get_max_bound()) - np.asarray(self.bbox.get_min_bound()))
-        self.outer_radius = self.bbox_diagonal*1.5
+        self.outer_radius = self.bbox_diagonal*1.0
 
     def load_ply(self, print_info):
         """
@@ -45,9 +53,9 @@ class PLYManager:
         
         Returns: A numpy array of all points in the inner and outer ply files.
         """
-        if print_info: print(f">>> loading {self.object_file_name + "_in.ply"}...")
+        if print_info: print(f">>> loading {self.object_file_name + '_in.ply'}...")
         self.inner_pcd = o3d.io.read_point_cloud(self.object_file_name + "_in.ply")
-        if print_info: print(f">>> loading {self.object_file_name + "_out.ply"}...")
+        if print_info: print(f">>> loading {self.object_file_name + '_out.ply'}...")
         self.outer_pcd = o3d.io.read_point_cloud(self.object_file_name + "_out.ply")
         self.combined = self.get_ply_combined()
         if self.combined.has_points():
@@ -155,7 +163,28 @@ class PLYManager:
         """
         mask = point_collision_counts > 0
         return self.points[mask]
-
+    
+    def get_collided_inpoints(self, collision_points: np.ndarray):
+        if self.inner_pcd is None:
+            return np.array([])
+        # Convert collision_points (list) to a NumPy array
+        collision_points_np = np.asarray(collision_points)
+        # Create mask using the converted NumPy array
+        mask = np.array([tuple(point) in self.inpoints_set for point in collision_points_np], dtype=bool)
+        # Index the converted array with the mask
+        return collision_points_np[mask]
+    
+    def get_collided_outpoints(self, collision_points: np.ndarray):
+        if self.outer_pcd is None:
+            return np.array([])
+        # Convert collision_points (list) to a NumPy array
+        collision_points_np = np.asarray(collision_points)
+        # Create mask using the converted NumPy array
+        mask = np.array([tuple(point) in self.outpoints_set for point in collision_points_np], dtype=bool)
+        # Index the converted array with the mask
+        return collision_points_np[mask]
+    
+    
 def on_press(key, process):
     try:
         if key == keyboard.Key.esc:
@@ -203,7 +232,7 @@ def visualizer_process(collision_queue, ply_obj_name, origin):
     
     # Set rendering options
     render_opt = vis.get_render_option()
-    render_opt.point_size = 4.0
+    render_opt.point_size = 2.0
     render_opt.light_on = True
     render_opt.background_color = [1, 1, 1]
     vis.add_geometry(coordinate_frame)
@@ -330,14 +359,15 @@ def main(ply_obj_name, config):
 
     # Load point cloud
     point_cloud = PLYManager(ply_obj_name, origin_point=config['origin_point'])
-    bbox_diag = point_cloud.bbox_diagonal
-    ball_radius = ball_radius_factor * bbox_diag
+    ball_radius = ball_radius_factor * point_cloud.bbox_diagonal
 
     # Initialize simulator
     simulator = ScatterSimulator(point_cloud, ball_radius, p=p, num_balls=num_balls, render=render)
     # add first spawn point
     simulator.data['points'].append(simulator.origin)
     simulator.data['ball_scatter_dir'].append(np.array([0, 0, 0]))
+    print(f"----> ball radius: {simulator.ball_radius}, collision margin: {simulator.collision_margin}, outer radius: {simulator.outer_radius}")
+    print(f"----> origin: {simulator.origin}, t_max: {simulator.t_max}, bbox_diagonal: {simulator.bbox_diagonal}")
 
     # Create communication queue
     if render:
@@ -348,10 +378,7 @@ def main(ply_obj_name, config):
         vis_proc.daemon = True
         vis_proc.start()
     
-    print(f"----> ball radius: {simulator.ball_radius}, collision margin: {simulator.collision_margin}, outer radius: {simulator.outer_radius}" +
-          f", origin: {simulator.origin}")
-    
-    # Main simulation loop
+    # Main simulation loop----------------------------------------------------------------------------
     print(">>> starting simulation...")
     start_time = time.time()
     last_update_time = time.time()
@@ -359,11 +386,12 @@ def main(ply_obj_name, config):
     
     pbar = tqdm(range(num_balls), desc=f"Ball: {0}, inner points: {len(simulator.data['points'])}")
     for i in pbar:
-        pbar.set_description(f"Ball: {i}, inner points: {len(simulator.data['points'])}")
+        if i % (num_balls / 1000) == 0:
+            pbar.set_description(f"Collected points: {len(simulator.data['points'])}, dup rate: {simulator.data['dup_rate'][-1]:.2f}, avg_moves: {simulator.avg_move_count:.2f}")
         simulator.simulate_ball(max_steps=max_steps, max_collisions=max_collisions, diffusion=diffusion)
         # Update visualization every 5 seconds
         current_time = time.time()
-        if render and (current_time - last_update_time >= 5 or i == 0):
+        if render and (current_time - last_update_time >= 1 or i == 0):
             try:
                 # Send a deep copy of sampled collision points
                 keys_to_keep = ['points', 'ball_scatter_dir']
@@ -404,41 +432,42 @@ def main(ply_obj_name, config):
                     vis_proc.join()
                 listener.stop()
 
-    # Print summary
-    print(f"\n>>> scatter process finished (total time: {end_time - start_time :.2f})")
+    # get performance metrics ---------------------------------------------------------------------
+    simulation_data['inner_points'] = point_cloud.get_collided_points(simulator.data['point_counts']) # get inner points from point counts, not points
+    metrics = point_cloud.get_evaluation_metrics(simulation_data['inner_points'])
+    simulation_data['point_counts'] = simulator.data['point_counts']
+    simulation_data['dup_count_history'] = simulator.data['duplicate_counts']
+    simulation_data['add_count_history'] = np.array(simulator.data['collision_count']) - np.array(simulator.data['duplicate_counts'])
+    simulation_data['dup_rate_history'] = simulator.data['dup_rate']
+    simulation_data['escape_history'] = simulator.data['escape_history']
+    simulation_data['inner_added'] = simulator.data['inner_added']
+    simulation_data['outer_added'] = simulator.data['outer_added']
+    simulation_data['time_elapsed'] = end_time - start_time
+    simulation_data['metrics'] = metrics
+
+    # Print summary ----------------------------------------------------------------------------
+    print(f"{'-'*80}\n>>> scatter process finished (total time: {end_time - start_time :.2f})")
     print(f"---> file total points: {len(np.asarray(simulator.point_cloud.get_ply_combined().points))}")
-    print(f"---> inner points: {len(simulator.data['points'])}")
+    print(f"---> inner points: {len(simulation_data['inner_points'])}")
     print(f"---> collisions ({sum((simulator.data['collision_count']))}), avg collisions per ball: {np.mean(simulator.data['collision_count'])}")
     print(f"---> removed points ({sum((simulator.data['duplicate_counts']))}), avg dup count per ball: {np.mean(simulator.data['duplicate_counts'])}")
     avg_dup_rate_total = np.array(simulator.data['duplicate_counts']) / (np.array(simulator.data['collision_count'])+0.01)
     print(f"---> avg dup rate: {np.mean(avg_dup_rate_total)}, abs dup rate: {sum((simulator.data['duplicate_counts']))/(sum((simulator.data['collision_count']))+0.01)}")
     print(f"point counts range: min: {simulator.data['point_counts'].min()}, max: {simulator.data['point_counts'].max()}, mean: {np.mean(simulator.data['point_counts'])}")
     
-    # get performance metrics
-    if render:
-        simulation_data['inner_points'] = simulator.data['points']
-    else:
-        simulation_data['inner_points'] = point_cloud.get_collided_points(simulator.data['point_counts'])
-    metrics = point_cloud.get_evaluation_metrics(simulation_data['inner_points'])
-    simulation_data['dup_count_history'] = simulator.data['duplicate_counts']
-    simulation_data['add_count_history'] = np.array(simulator.data['collision_count']) - np.array(simulator.data['duplicate_counts'])
-    simulation_data['dup_rate_history'] = simulator.data['dup_rate']
-    simulation_data['escape_history'] = simulator.data['escape_history']
-    simulation_data['time_elapsed'] = time.time() - start_time
-    simulation_data['metrics'] = metrics
     return simulation_data
 
 
 config_1 = {
-    'simulation_name': 'hourglass_closed',
+    'simulation_name': 'hourglass_closed_ballSize_0.01',
     'ply_file': './ply_files/test ply inputs/hourglass_closed',
     'origin_point': [0, 0, 20],
     'render': True,
-    'num_balls' : 10000,
+    'num_balls' : 50000,
     'max_steps' : 50,
-    'max_collisions': 10,
+    'max_collisions': 5,
     'ball_radius_factor' : 0.01,
-    'p' : 0.9,
+    'p' : 0.98,
     'diffusion' : True
 }
 config_2 = {
@@ -446,21 +475,21 @@ config_2 = {
     'ply_file': './ply_files/test ply inputs/hourglass_opened',
     'origin_point': [0, 0, 20],
     'render': True,
-    'num_balls' : 400,
+    'num_balls' : 50000,
     'max_steps' : 50,
-    'max_collisions': 10,
+    'max_collisions': 5,
     'ball_radius_factor' : 0.01,
-    'p' : 0.9,
+    'p' : 0.98,
     'diffusion' : True
 }
 config_3 = {
-    'simulation_name': 'snail_2',
+    'simulation_name': 'snail_unique_score_off',
     'ply_file': './ply_files/test ply inputs/snail',
     'origin_point': [0, 0, 0],
-    'render': True,
-    'num_balls' : 50000,
-    'max_steps' : 50,
-    'max_collisions': 10,
+    'render': False,
+    'num_balls' : 5000,
+    'max_steps' : 500,
+    'max_collisions': 50,
     'ball_radius_factor' : 0.01,
     'p' : 0.98,
     'diffusion' : True
@@ -470,31 +499,31 @@ config_4 = {
     'ply_file': './ply_files/test ply inputs/sphere',
     'origin_point': [0, 0, 0],
     'render': True,
-    'num_balls' : 400,
+    'num_balls' : 50000,
     'max_steps' : 50,
-    'max_collisions': 10,
+    'max_collisions': 5,
     'ball_radius_factor' : 0.01,
-    'p' : 0.9,
+    'p' : 0.98,
     'diffusion' : True
 }
 config_5 = {
     'simulation_name': 'stomach_1',
     'ply_file': './ply_files/reconstructed/stomach_1',
     'origin_point': [0, 0, 0],
-    'render': True,
-    'num_balls' : 10000,
+    'render': False,
+    'num_balls' : 50000,
     'max_steps' : 50,
     'max_collisions': 5,
     'ball_radius_factor' : 0.007,
-    'p' : 0.95,
+    'p' : 0.98,
     'diffusion' : True
 }
 config_6 = {
-    'simulation_name': 'stomach_2_v2',
+    'simulation_name': 'stomach_2_unique_score_off',
     'ply_file': './ply_files/reconstructed/pc_layer0_2025-07-07-10-07',
     'origin_point': [0, 0, 0],
-    'render': True,
-    'num_balls' : 50000,
+    'render': False,
+    'num_balls' : 500000,
     'max_steps' : 50,
     'max_collisions': 5,
     'ball_radius_factor' : 0.007,
@@ -506,15 +535,39 @@ config_7 = {
     'ply_file': './ply_files/reconstructed/pc_layer0_2025-07-21-01-59',
     'origin_point': [0, 0, 0],
     'render': True,
-    'num_balls' : 10000,
+    'num_balls' : 100000,
     'max_steps' : 50,
     'max_collisions': 5,
     'ball_radius_factor' : 0.007,
-    'p' : 0.95,
+    'p' : 0.98,
+    'diffusion' : True
+}
+config_8 = {
+    'simulation_name': 'compartment_spawn_50_unique_score_off',
+    'ply_file': './ply_files/test ply inputs/compartment_v2',
+    'origin_point': [0, 0, 0],
+    'render': True,
+    'num_balls' : 50000,
+    'max_steps' : 50,
+    'max_collisions': 5,
+    'ball_radius_factor' : 0.0025,
+    'p' : 0.999,
+    'diffusion' : True
+}
+config_9 = {
+    'simulation_name': 'ball_unique_score_on',
+    'ply_file': './ply_files/test ply inputs/ball',
+    'origin_point': [0, 0, 0],
+    'render': True,
+    'num_balls' : 50000,
+    'max_steps' : 50,
+    'max_collisions': 5,
+    'ball_radius_factor' : 0.01,
+    'p' : 0.999,
     'diffusion' : True
 }
 
-config = config_6
+config = config_1
 
 if __name__ == "__main__":
     SIMULATION_NAME = config['simulation_name']
@@ -526,13 +579,13 @@ if __name__ == "__main__":
     print("")
 
     # Run main simulation
-    print(f"{"-"*80+"\n"}running main simulation...\n{"-"*80}")
+    print(f"{'-'*80}\nrunning main simulation...\n{'-'*80}")
     simulation_data = main(INPUT_PLY_FILE, config)
-    print("\n")
+    print('\n')
     # Performance metrics
-    print(f"{"-"*80+"\n"}showing performance metrics...\n{"-"*80}")
+    print(f"{'-'*80}\nshowing performance metrics...\n{'-'*80}")
     print_dict(simulation_data['metrics'])
-    print("\n")
+    print('\n')
 
     '''run_info = []
     for i in np.arange(0, 1.2, 0.2):
@@ -548,7 +601,7 @@ if __name__ == "__main__":
         print(info)'''
     
     # Save results
-    print(f"{"-"*80+"\n"}Saving results...\n{"-"*80}")
+    print(f"{'-'*80}\nSaving results...\n{'-'*80}")
     print(f">>> Outputting inner point cloud to {OUTPUT_PLY_FILE}")
     output_pcd = o3d.geometry.PointCloud()
     output_pcd.points = o3d.utility.Vector3dVector(simulation_data['inner_points'])
@@ -556,4 +609,4 @@ if __name__ == "__main__":
     print(f">>> saving simulation data to {OUTPUT_SIM_DATA}")
     with open(OUTPUT_SIM_DATA, 'wb') as f:
         pkl.dump(simulation_data, f)
-    print("\n")
+    print('\n')
