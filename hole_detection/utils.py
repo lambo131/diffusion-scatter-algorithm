@@ -1,5 +1,6 @@
 import random
 import numpy as np
+from scipy.optimize import curve_fit
 
 def sample_dict(dictionary, sample_size=1, ordered=False):
     """
@@ -211,6 +212,64 @@ def get_diffusion_probability(min_path_len, max_path_len, path_len):
     diff = max_path_len - min_path_len
     prob = -sigmoid(path_len-(min_path_len+diff/4), width_coef=diff)+1
     return prob
+
+
+
+
+def fit_exponential_increment(signal):
+    if len(signal) == 0:
+        return (0.0, 0.0)
+    
+    t_data = np.arange(len(signal))
+    
+    if signal[0] < 1:
+        initial_A0 = 1 - signal[0]
+        if len(signal) >= 2 and signal[1] < 1:
+            if (1 - signal[0]) > 1e-6 and (1 - signal[1]) > 1e-6:
+                ratio = (1 - signal[1]) / (1 - signal[0])
+                if ratio > 1e-6:
+                    initial_k = -np.log(ratio)
+                else:
+                    initial_k = 10.0
+            else:
+                initial_k = 0.1
+        else:
+            initial_k = 0.1
+    else:
+        initial_A0 = 0.0
+        initial_k = 0.0
+    
+    def model(t, A0, k):
+        return 1 - A0 * np.exp(-k * t)
+    
+    lower_bounds = [0, 0]
+    upper_bounds = [np.inf, np.inf]
+    
+    try:
+        popt, _ = curve_fit(model, t_data, signal, p0=[initial_A0, initial_k], bounds=(lower_bounds, upper_bounds))
+        A0_fit, k_fit = popt
+    except RuntimeError:
+        A0_fit, k_fit = initial_A0, initial_k
+    
+    return (A0_fit, k_fit)
+
+import numpy as np
+
+def get_fitted_curve(A0, k, N):
+    """
+    Generate the fitted exponential increment curve for N time points.
+    
+    Parameters:
+    A0 (float): The amplitude parameter from the fitted model.
+    k (float): The rate constant from the fitted model.
+    N (int): Number of samples to generate (time points from 0 to N-1).
+    
+    Returns:
+    numpy.ndarray: Array of N values representing the fitted curve.
+    """
+    t = np.arange(N)
+    return 1 - A0 * np.exp(-k * t)
+
 
 class FixedSizeArray:
     def __init__(self, max_size):

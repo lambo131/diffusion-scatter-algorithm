@@ -100,12 +100,12 @@ class PLYManager:
         FP = self.count_identical_points_kdtree(outer_points, inner_points_detected)
         TN = N - FP
         FN = P - TP
-        accuracy = TP / (TP + FP + FN)
-        precision = TP / (TP + FP)
-        recall = TP / (TP + FN)
-        f1_score = 2 * (precision * recall) / (precision + recall)
-        inner_points_percentage = TP / P
-        outer_points_percentage = FP / N
+        accuracy = TP / (TP + FP + FN + 1e-5)
+        precision = TP / (TP + FP + 1e-5)
+        recall = TP / (TP + FN + 1e-5)
+        f1_score = 2 * (precision * recall) / (precision + recall + 1e-5)
+        inner_points_percentage = TP / (P + 1e-5)
+        outer_points_percentage = FP / (N + 1e-5)
         return {
             "accuracy": accuracy,
             "precision": precision,
@@ -183,6 +183,39 @@ class PLYManager:
         mask = np.array([tuple(point) in self.outpoints_set for point in collision_points_np], dtype=bool)
         # Index the converted array with the mask
         return collision_points_np[mask]
+    
+    def get_average_separation(self, sample_size):
+        """
+        Compute the average distance from each point in the cloud to its closest other point.
+        
+        Args:
+            sample_size (float): ratio (from 0 to 1.0) of points to sample.
+        
+        Returns:
+            float: the average separation distance.
+        """
+        
+        n = len(self.combined.points)
+        if n < 2:
+            return 0.0
+            
+        n_sample = int(n * sample_size)
+        if n_sample == 0:
+            return 0.0
+            
+        indices = random.sample(range(n), n_sample)
+        
+        total_distance = 0.0
+        for i in indices:
+            point = self.combined.points[i]
+            [k, idx, dist_squared] = self.kdtree.search_knn_vector_3d(point, 2)
+            if k >= 2:
+                if idx[0] == i:
+                    d = dist_squared[1]
+                else:
+                    d = dist_squared[0]
+                total_distance += math.sqrt(d)
+        return total_distance / n_sample
     
     
 def on_press(key, process):
@@ -348,7 +381,7 @@ def update_visualizer_child(vis, inner_spheres, bounce_dir_geometry, spawn_point
     
     return inner_spheres, bounce_dir_geometry, spawn_points
 
-def main(ply_obj_name, config):
+def run_simulation(ply_obj_name, config):
     render = config['render']
     num_balls = config['num_balls']
     max_steps = config['max_steps']
@@ -359,13 +392,15 @@ def main(ply_obj_name, config):
 
     # Load point cloud
     point_cloud = PLYManager(ply_obj_name, origin_point=config['origin_point'])
-    ball_radius = ball_radius_factor * point_cloud.bbox_diagonal
+    avg_separation = point_cloud.get_average_separation(0.5)
+    ball_radius = ball_radius_factor * avg_separation
 
     # Initialize simulator
     simulator = ScatterSimulator(point_cloud, ball_radius, p=p, num_balls=num_balls, render=render)
     # add first spawn point
     simulator.data['points'].append(simulator.origin)
     simulator.data['ball_scatter_dir'].append(np.array([0, 0, 0]))
+    print(f"----> avg seperation: {avg_separation}")
     print(f"----> ball radius: {simulator.ball_radius}, collision margin: {simulator.collision_margin}, outer radius: {simulator.outer_radius}")
     print(f"----> origin: {simulator.origin}, t_max: {simulator.t_max}, bbox_diagonal: {simulator.bbox_diagonal}")
 
@@ -459,14 +494,14 @@ def main(ply_obj_name, config):
 
 
 config_1 = {
-    'simulation_name': 'hourglass_closed_ballSize_0.01',
+    'simulation_name': 'hourglass_closed',
     'ply_file': './ply_files/test ply inputs/hourglass_closed',
     'origin_point': [0, 0, 20],
-    'render': True,
+    'render': False,
     'num_balls' : 50000,
     'max_steps' : 50,
     'max_collisions': 5,
-    'ball_radius_factor' : 0.01,
+    'ball_radius_factor' : 2,
     'p' : 0.98,
     'diffusion' : True
 }
@@ -478,19 +513,19 @@ config_2 = {
     'num_balls' : 50000,
     'max_steps' : 50,
     'max_collisions': 5,
-    'ball_radius_factor' : 0.01,
+    'ball_radius_factor' : 2,
     'p' : 0.98,
     'diffusion' : True
 }
 config_3 = {
-    'simulation_name': 'snail_unique_score_off',
+    'simulation_name': 'snail',
     'ply_file': './ply_files/test ply inputs/snail',
     'origin_point': [0, 0, 0],
-    'render': False,
-    'num_balls' : 5000,
-    'max_steps' : 500,
+    'render': True,
+    'num_balls' : 50000,
+    'max_steps' : 50,
     'max_collisions': 50,
-    'ball_radius_factor' : 0.01,
+    'ball_radius_factor' : 2,
     'p' : 0.98,
     'diffusion' : True
 }
@@ -502,7 +537,7 @@ config_4 = {
     'num_balls' : 50000,
     'max_steps' : 50,
     'max_collisions': 5,
-    'ball_radius_factor' : 0.01,
+    'ball_radius_factor' : 2,
     'p' : 0.98,
     'diffusion' : True
 }
@@ -510,11 +545,11 @@ config_5 = {
     'simulation_name': 'stomach_1',
     'ply_file': './ply_files/reconstructed/stomach_1',
     'origin_point': [0, 0, 0],
-    'render': False,
+    'render': True,
     'num_balls' : 50000,
     'max_steps' : 50,
     'max_collisions': 5,
-    'ball_radius_factor' : 0.007,
+    'ball_radius_factor' : 2,
     'p' : 0.98,
     'diffusion' : True
 }
@@ -522,11 +557,11 @@ config_6 = {
     'simulation_name': 'stomach_2_unique_score_off',
     'ply_file': './ply_files/reconstructed/pc_layer0_2025-07-07-10-07',
     'origin_point': [0, 0, 0],
-    'render': False,
+    'render': True,
     'num_balls' : 500000,
     'max_steps' : 50,
     'max_collisions': 5,
-    'ball_radius_factor' : 0.007,
+    'ball_radius_factor' : 2,
     'p' : 0.98,
     'diffusion' : True
 }
@@ -538,19 +573,19 @@ config_7 = {
     'num_balls' : 100000,
     'max_steps' : 50,
     'max_collisions': 5,
-    'ball_radius_factor' : 0.007,
+    'ball_radius_factor' : 2,
     'p' : 0.98,
     'diffusion' : True
 }
 config_8 = {
-    'simulation_name': 'compartment_spawn_50_unique_score_off',
+    'simulation_name': 'compartment',
     'ply_file': './ply_files/test ply inputs/compartment_v2',
     'origin_point': [0, 0, 0],
     'render': True,
-    'num_balls' : 50000,
+    'num_balls' : 500000,
     'max_steps' : 50,
     'max_collisions': 5,
-    'ball_radius_factor' : 0.0025,
+    'ball_radius_factor' : 3,
     'p' : 0.999,
     'diffusion' : True
 }
@@ -562,14 +597,12 @@ config_9 = {
     'num_balls' : 50000,
     'max_steps' : 50,
     'max_collisions': 5,
-    'ball_radius_factor' : 0.01,
+    'ball_radius_factor' : 2,
     'p' : 0.999,
     'diffusion' : True
 }
 
-config = config_1
-
-if __name__ == "__main__":
+def main():
     SIMULATION_NAME = config['simulation_name']
     INPUT_PLY_FILE = config['ply_file']
     OUTPUT_DIR = "./ply_files/output/"
@@ -580,26 +613,12 @@ if __name__ == "__main__":
 
     # Run main simulation
     print(f"{'-'*80}\nrunning main simulation...\n{'-'*80}")
-    simulation_data = main(INPUT_PLY_FILE, config)
+    simulation_data = run_simulation(INPUT_PLY_FILE, config)
     print('\n')
     # Performance metrics
     print(f"{'-'*80}\nshowing performance metrics...\n{'-'*80}")
     print_dict(simulation_data['metrics'])
     print('\n')
-
-    '''run_info = []
-    for i in np.arange(0, 1.2, 0.2):
-        for j in range(3):
-            config['p'] = i
-            simulation_data = main(INPUT_PLY_FILE, config)
-            num_inner_points = len(simulation_data['inner_points'])
-            dup_count_history = simulation_data['dup_count_history']
-            escaped_count = simulation_data['escaped_count']
-            time_elapsed = simulation_data['time_elapsed']   
-            run_info.append([i, j, num_inner_points, sum(dup_count_history), escaped_count, time_elapsed])
-    for info in run_info:
-        print(info)'''
-    
     # Save results
     print(f"{'-'*80}\nSaving results...\n{'-'*80}")
     print(f">>> Outputting inner point cloud to {OUTPUT_PLY_FILE}")
@@ -610,3 +629,20 @@ if __name__ == "__main__":
     with open(OUTPUT_SIM_DATA, 'wb') as f:
         pkl.dump(simulation_data, f)
     print('\n')
+
+
+config = config_6
+if __name__ == "__main__":
+    main()
+
+'''name_loop = ["compartment_ballSize_0.1", "compartment_ballSize_0.2","compartment_ballSize_0.4",
+             "compartment_ballSize_0.7", "compartment_ballSize_1", "compartment_ballSize_2",
+             "compartment_ballSize_4", "compartment_ballSize_7", "compartment_ballSize_10",]
+arg_a_loop = [0.1, 0.2, 0.4, 0.7, 1, 2, 4, 7, 10]
+
+
+if __name__ == "__main__":
+    for (name, arg_a) in zip(name_loop, arg_a_loop): 
+        config['simulation_name'] = name
+        config['ball_radius_factor'] = arg_a
+        main()'''

@@ -50,7 +50,7 @@ class ScatterSimulator:
                  ball_radius, 
                  collision_margin_ratio=0.5, 
                  p=1, num_balls=1000, 
-                 max_spawn_points=50, 
+                 max_spawn_points=200, 
                  render=False):
         
         self.point_cloud = point_cloud
@@ -193,7 +193,7 @@ class ScatterSimulator:
                     # if (collision_count > 2) and not contains_vector(last_collision_point, self.data['points'][:-2]):
                     if last_collision_point is not None and self.data['dup_rate'][-1] > 0.5:
                         spawn_point_candidate = ((last_collision_point + collision_point) / 2.0)
-                        k, idx, _ = self.point_cloud.kdtree.search_radius_vector_3d(spawn_point_candidate, self.ball_radius * 1.1) # avoid intersecting with existing points
+                        k, idx, _ = self.point_cloud.kdtree.search_radius_vector_3d(spawn_point_candidate, self.ball_radius * 1.01) # avoid intersecting with existing points
                         if spawn_point_count > 0:
                             spawn_pcd = o3d.geometry.PointCloud()
                             spawn_pcd.points = o3d.utility.Vector3dVector(np.vstack(self.data['spawn_points']))
