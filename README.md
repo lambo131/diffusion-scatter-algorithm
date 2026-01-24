@@ -84,12 +84,11 @@ remain undetected, indicating convergence of the diffusion process.
 
 The simulation in a non-watertight 3D ball models, the metrics of
 $N_{escape}$ vs step $i$ and $R_{inter}, R{outer}$ vs step $i$ is shwon
-in Figure [\[fig:opensphere\]](#fig:opensphere){reference-type="ref"
-reference="fig:opensphere"}. Additionally, only a small proportion(shown
-in Figure [\[fig:opensphere\]](#fig:opensphere){reference-type="ref"
-reference="fig:opensphere"}(b) 0.001) of outer layer points are
+in Figur. Additionally, only a small proportion(shown
+in Figure of outer layer points are
 detected, confirming the algorithm's effectiveness in prioritizing inter
 layer exploration in non-watertight models.
+![](images/OpenSphere2.png)
 
 ## Parallel Acceleration
 
