@@ -60,15 +60,16 @@ $R_{ball}=4R_0$, $collision \; margin=0.5 R_{ball}$,
 $R_{eff} = 1.5 R_{ball}$, and $L_{max}=50R_0$, $p=0.999$, also limit
 number of steps to 50 and the collisions limit as 5. And the metrics for $R_{dup}$ vs step $i$ and
 $R_{inter}, R{outer}$ vs step $i$.
-![](images/Ballsize2.png)
+
+![Performance metrics of the diffusion-based algorithm of closed double layer ball 3D model(20000 inter layer points and 20000 outer layer points) with $R_{ball}=2 R_0](images/Ballsize2.png)
+
 To quantify the performance of our diffusion-driven algorithm in
 identifying inter surfaces of non-watertight point clouds, we define
 $R_{\text{inter}}(i)$ as the proportion of correctly identified inter
 surface points after $i$ particle simulation iterations. The convergence
 of $R_{\text{inter}}$ is modeled using an exponential saturation
 function:
-$R_{\text{inter}}(i) = A_0 \left( 1 - \exp\left(-\frac{i}{\tau}\right) \right),
-\label{eq:rinter}$ where $A_0 = 0.970$ represents the maximum
+$R_{\text{inter}}(i) = A_0 \left( 1 - \exp\left(-\frac{i}{\tau}\right) \right)$ where $A_0 = 0.970$ represents the maximum
 achievable proportion of correctly identified inter points (saturation
 level), and $\tau = 6424.3$ is the time constant governing the rate of
 convergence. This model reflects the cumulative effect of particle
