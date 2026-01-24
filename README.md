@@ -67,8 +67,8 @@ $R_{\text{inter}}(i)$ as the proportion of correctly identified inter
 surface points after $i$ particle simulation iterations. The convergence
 of $R_{\text{inter}}$ is modeled using an exponential saturation
 function:
-$$R_{\text{inter}}(i) = A_0 \left( 1 - \exp\left(-\frac{i}{\tau}\right) \right),
-\label{eq:rinter}$$ where $A_0 = 0.970$ represents the maximum
+$R_{\text{inter}}(i) = A_0 \left( 1 - \exp\left(-\frac{i}{\tau}\right) \right),
+\label{eq:rinter}$ where $A_0 = 0.970$ represents the maximum
 achievable proportion of correctly identified inter points (saturation
 level), and $\tau = 6424.3$ is the time constant governing the rate of
 convergence. This model reflects the cumulative effect of particle
