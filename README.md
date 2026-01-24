@@ -16,7 +16,9 @@ point cloud, and generates new spawn points to explore the geometry. The
 simulation terminates when the simulation ball collision number reaches
 a predefined limit or exits the escape boundary sphere which encloses
 the entire point cloud as shown by the gray dashed sphere ).
+
 ![Diffusion algorithm visualization. The point cloud represents a hollow object with inter surface points (red) and outer surface points (black). Purple balls marked 0, 1, 2, and 3 represent the initial spawn point, reflected point, free-moving point, and escape point, respectively. The gray dashed sphere is the escape boundary sphere centered at the initial spawn point (0).](images/DiffusionAlgorithm.png)
+
 
 # Results
 
@@ -61,7 +63,7 @@ $R_{eff} = 1.5 R_{ball}$, and $L_{max}=50R_0$, $p=0.999$, also limit
 number of steps to 50 and the collisions limit as 5. And the metrics for $R_{dup}$ vs step $i$ and
 $R_{inter}, R{outer}$ vs step $i$.
 
-![Performance metrics of the diffusion-based algorithm of closed double layer ball 3D model(20000 inter layer points and 20000 outer layer points) with $R_{ball}=2 R_0](images/Ballsize2.png)
+<img src="images/Ballsize2.png" width="300" alt="描述文字">
 
 To quantify the performance of our diffusion-driven algorithm in
 identifying inter surfaces of non-watertight point clouds, we define
@@ -88,8 +90,8 @@ in Figur. Additionally, only a small proportion(shown
 in Figure of outer layer points are
 detected, confirming the algorithm's effectiveness in prioritizing inter
 layer exploration in non-watertight models.
-![](images/OpenSphere2.png)
 
+<img src="images/OpenSphere2.png" width="300" alt="描述文字">
 ## Parallel Acceleration
 
 To enhance computational efficiency, a parallelized version of the code
