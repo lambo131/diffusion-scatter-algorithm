@@ -17,153 +17,96 @@ simulation terminates when the simulation ball collision number reaches
 a predefined limit or exits the escape boundary sphere which encloses
 the entire point cloud as shown by the gray dashed sphere ).
 ![Diffusion algorithm visualization. The point cloud represents a hollow object with inter surface points (red) and outer surface points (black). Purple balls marked 0, 1, 2, and 3 represent the initial spawn point, reflected point, free-moving point, and escape point, respectively. The gray dashed sphere is the escape boundary sphere centered at the initial spawn point (0).](images/DiffusionAlgorithm.png)
-### Initialization
 
-The simulation begins by setting up the environment and parameters as
-follows:
+# Results
 
-1.  **Point Cloud Loading**: Load the raw point cloud data of a hollow
-    object as a NumPy array, representing 3D points that define the
-    object's geometry. The point cloud consists of interior surface
-    points (total number $N_{\text{inter}}$), representing the interior
-    surface, and outer surface points (total number $N_{\text{outer}}$),
-    representing the exterior surface. The total point count is
-    $N_t = N_{\text{inter}} + N_{\text{outer}}$. The unit length of
-    point cloud $R_0$ as the average length of the nearest point cloud
-    distance.
+The performance of the diffusion-based algorithm is evaluated using
+several metrics, particularly focusing on the duplication rate and the
+detection of inter and outer layer points in a 3D point cloud model.
 
-2.  **Spawn Point Initialization**: Designate an initial spawn point
-    manually (purple sphere marked \"0\" in
-    Figure [\[fig:DiffusionAlgorithm\]](#fig:DiffusionAlgorithm){reference-type="ref"
-    reference="fig:DiffusionAlgorithm"}) inside the point cloud, serving
-    as the original spawn point of the simulation(usually the geometry
-    center of the point cloud).
+For the $i$-th simulation step, the duplication rate is defined as:
+$$R_{dup}(i) = \frac{|\{ \text{Dup}(i) \}|}{|\{ \text{Collide}(i) \}|},$$
+where $|\{ \text{Dup}(i) \}|$ is the number of duplicate collided points
+(points hit multiple times) and $|\{ \text{Collide}(i) \}|$ is the total
+number of collided points at step $i$. The diffusion process terminates
+when $R_{dup}(i) \geq 0.99$ for 10 consecutive simulation steps,
+indicating that most collisions involve previously hit points,
+suggesting near-complete exploration of the inter layer.
 
-3.  **Escape Boundary Setup**: Define an escape boundary sphere centered
-    at the bounding box center with a radius large enough to enclose the
-    entire point cloud (gray dashed sphere in
-    Figure [\[fig:DiffusionAlgorithm\]](#fig:DiffusionAlgorithm){reference-type="ref"
-    reference="fig:DiffusionAlgorithm"}).
+During the simulation, the total number of steps $i$ is the sum of steps
+where the simulation ball escapes the model ($N_{escape}$) and where it
+remains within the model ($N_{nescap}$), i.e.,
+$i = N_{escape} + N_{nescap}$. For a watertight inter layer,
+$N_{escape} = 0$, as the simulation ball cannot exit. However, in a
+non-watertight model, $N_{escape} > 0$. We use the criterion
+$N_{escape} > 5$ to classify the point cloud model as non-watertight,
+accounting for potential simulation errors.
 
-4.  **Simulation Parameters Setup**:
+The detected point cloud, $C_{detect}$, comprises the inter layer
+points, $C_{inter}$, and outer layer points, $C_{outer}$, such that
+$C_{detect} = C_{inter} + C_{outer}$. The detection rate for the inter
+layer is defined as: $$R_{inter} = \frac{C_{inter}}{N_{inter}},$$ where
+$N_{inter}$ is the total number of inter layer points. Ideally,
+$R_{inter} = 1$ when all inter layer points are detected. Similarly, the
+detection rate for the outer layer is:
+$$R_{outer} = \frac{C_{outer}}{N_{outer}},$$ where $N_{outer}$ is the
+total number of outer layer points. Ideally, $R_{outer} = 0$ when no
+outer layer points are detected.
 
-    -   $R_{\text{ball}}$: Radius of the simulation ball.
+## Performance in Watertight 3D Model {#sec:performance_watertight}
 
-    -   $L_{\text{max}}$: Maximum distance the simulation ball moves in
-        a single step if no collision occurs.
+In this simulation of a watertight double layer ball 3D mode, we set the
+$R_{ball}=4R_0$, $collision \; margin=0.5 R_{ball}$,
+$R_{eff} = 1.5 R_{ball}$, and $L_{max}=50R_0$, $p=0.999$, also limit
+number of steps to 50 and the collisions limit as 5. And the metrics are
+shown in
+Figure [\[fig:performance\]](#fig:performance){reference-type="ref"
+reference="fig:performance"} for $R_{dup}$ vs step $i$ and
+$R_{inter}, R{outer}$ vs step $i$.
 
-    -   $R_{eff}$: Effective collision radius, defined as
-        $R_{eff}  = R_{\text{ball}} + \text{collision margin}$.
-### Simulation Process
+To quantify the performance of our diffusion-driven algorithm in
+identifying inter surfaces of non-watertight point clouds, we define
+$R_{\text{inter}}(i)$ as the proportion of correctly identified inter
+surface points after $i$ particle simulation iterations. The convergence
+of $R_{\text{inter}}$ is modeled using an exponential saturation
+function:
+$$R_{\text{inter}}(i) = A_0 \left( 1 - \exp\left(-\frac{i}{\tau}\right) \right),
+\label{eq:rinter}$$ where $A_0 = 0.970$ represents the maximum
+achievable proportion of correctly identified inter points (saturation
+level), and $\tau = 6424.3$ is the time constant governing the rate of
+convergence. This model reflects the cumulative effect of particle
+collisions, where the algorithm progressively covers the inter surface
+through diffusion, with performance stabilizing as more particles are
+simulated.
 
-The simulation iteratively traces the trajectory of a simulation ball as
-it moves, collides within the point cloud , or escapes from the point
-cloud. The process is as follows:
+Results show that $R_{dup}(i)$ approaches 1 as fewer inter layer points
+remain undetected, indicating convergence of the diffusion process.
 
-1.  **Simulation Ball Initialization**:
+## The simulation result in non-watertight 3D model
 
-    -   Spawn a simulation ball with radius $R_{\text{ball}}$ at a spawn
-        point, chosen with probability $p_0$ for a random spawn point
-        and $1-p_0$ for the initial spawn point. If no generated spawn
-        points exist, default to the initial spawn point.
+The simulation in a non-watertight 3D ball models, the metrics of
+$N_{escape}$ vs step $i$ and $R_{inter}, R{outer}$ vs step $i$ is shwon
+in Figure [\[fig:opensphere\]](#fig:opensphere){reference-type="ref"
+reference="fig:opensphere"}. Additionally, only a small proportion(shown
+in Figure [\[fig:opensphere\]](#fig:opensphere){reference-type="ref"
+reference="fig:opensphere"}(b) 0.001) of outer layer points are
+detected, confirming the algorithm's effectiveness in prioritizing inter
+layer exploration in non-watertight models.
 
-    -   Assign a random initial direction vector to the simulation ball.
+## Parallel Acceleration
 
-2.  **Simulation Ball Trajectory**:
-
-    -   The ball moves in a straight line for a distance up to
-        $L_{\text{max}}$ unless a collision occurs.
-
-    -   Upon collision with a point in the point cloud, compute a
-        reflected direction based on the local surface geometry, adding
-        a small random perturbation to simulate realistic scattering
-        (e.g., transition from point 0 to 1 in
-        Figure [\[fig:DiffusionAlgorithm\]](#fig:DiffusionAlgorithm){reference-type="ref"
-        reference="fig:DiffusionAlgorithm"}).
-
-    -   Track the number of steps (discrete movements) and collisions.
-        Terminate the ball if it reaches predefined limits for steps or
-        collisions.
-
-    -   If the ball exits the point cloud (e.g., through a hole), it may
-        collide with outer surface points(which can cause the false
-        point cloud collision) or reach the escape boundary sphere
-        (e.g., transition from point 2 to 3 in
-        Figure [\[fig:DiffusionAlgorithm\]](#fig:DiffusionAlgorithm){reference-type="ref"
-        reference="fig:DiffusionAlgorithm"}). Terminate the ball
-        movement upon reaching the escape boundary sphere.
-
-    More details about the ball movement and collision is written in
-    Section [0.1](#sec:collision_detection){reference-type="ref"
-    reference="sec:collision_detection"}.
-
-3.  **Dynamic Spawn Point Generation**: Generate new spawn points during
-    the simulation based on collision process (see
-    Section [\[sec:spawn_point_generation\]](#sec:spawn_point_generation){reference-type="ref"
-    reference="sec:spawn_point_generation"} for details).
-
-4.  **Iterative Simulation**: Upon termination of a simulation ball (due
-    to step/collision limits or escape), initialize a new simulation
-    ball and repeat the process from **Simulation Ball Initialization**,
-    incorporating generated spawn points and logged data.
-
-### Simulation Termination
-
-The simulation terminates when either of two conditions is met: the
-total number of simulation balls reaches a predefined maximum, or the
-duplication rate $R_{dup}$, as defined in
-Section [\[sec:result\]](#sec:result){reference-type="ref"
-reference="sec:result"}, reaches 0.99 for 10 consecutive iterations.
-These conditions ensure the algorithm stops when sufficient exploration
-is achieved or when further iterations yield minimal new information.
-
-## Collision Detection 
-
-During each simulation step, the simulation ball can either move freely,
-collide with a point, or escape the boundary sphere:
-
--   **Free Movement**: Use Open3D's
-    `kdtree.search_radius_vector_3d (current_ball_position, L_max +`$R_{eff}$` )`
-    to identify cloud points within the ball's potential movement volume
-    ($L_{\text{max}} + R_{eff}$). If no points are found, move the ball
-    by $L_{\text{max}}$ in its current direction.
-
--   **Collision**: If points are found within the movement range,
-    identify real collision points by checking for overlap with the
-    ball's path (using effective collision radius $R_{eff}$). Select the
-    closest point as the collision point. If no real collision occurs
-    (e.g., no positive roots in the collision equation), move the ball
-    by $L_{\text{max}}$.
-
--   **Escape**: After movement, check if the simulation ball's distance
-    from the center of the escape boundary sphere exceeds the boundary's
-    radius. If so, mark the simulation ball as escaped and terminate
-    this simulation iterative.
-## Spawn Point Generation 
-
-To improve exploration of the 3D point cloud's internal geometry, new
-spawn points are generated during the simulation. As the simulation ball
-collides with the point cloud at multiple points, the two most recent
-collision points are identified, and their midpoint is designated as a
-new spawn point. This method leverages the likelihood that the midpoint
-of two consecutive collisions lies within the internal volume of the 3D
-model, facilitating effective exploration of its geometry. To maintain
-diversity and avoid redundancy, a maximum of 200 spawn points is
-enforced. Additionally, each new spawn point is checked for proximity to
-existing spawn points; if it is too close (based on a predefined
-distance threshold), it is discarded, and the algorithm waits for the
-next collision to generate a new spawn point.
-
-## Output Information
-
-The algorithm outputs a Python dictionary containing the following
-parameters: {Collide($i$)}, the set of point cloud points collided with
-by the simulation ball at the $i$-th simulation step; {New($i$)}, the
-set of unique (non-repeating) collided points at the $i$-th step;
-{Dup($i$)}, the set of duplicate collided points (points hit multiple
-times) at the $i$-th step; $C_{outer}$, the number of outer surface
-points collided with by the simulation ball; $C_{inter}$, the number of
-interior surface points collided with; and $N_{nescap}$, the number of
-times the simulation ball escapes the designated escape boundary.
-
+To enhance computational efficiency, a parallelized version of the code
+was developed for the simulation of 3D double layer ball models
+(composed of 20000 inter points and 20000 outer points) over 500,000
+steps. The performance was evaluated on an Intel Core i9-14900K CPU,
+featuring 24 physical cores and 32 logical CPUs (with 2 threads per
+core) running at a maximum clock speed of 6.0 GHz. Tests were conducted
+across varying numbers of CPU processors, measuring both the time
+consumed and the processing rate in balls per second. The results,
+summarized in
+Table [\[tab:parallel_performance\]](#tab:parallel_performance){reference-type="ref"
+reference="tab:parallel_performance"}, demonstrate significant
+improvements in computational speed with increased processor counts,
+although diminishing returns are observed at higher processor numbers,
+likely due to overhead in thread management or resource contention.
 
