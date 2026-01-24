@@ -16,4 +16,4 @@ point cloud, and generates new spawn points to explore the geometry. The
 simulation terminates when the simulation ball collision number reaches
 a predefined limit or exits the escape boundary sphere which encloses
 the entire point cloud as shown by the gray dashed sphere ).
-![Diffusion algorithm visualization. The point cloud represents a hollow object with inter surface points (red) and outer surface points (black). Purple balls marked 0, 1, 2, and 3 represent the initial spawn point, reflected point, free-moving point, and escape point, respectively. The gray dashed sphere is the escape boundary sphere centered at the initial spawn point (0).](images/stomach3.png)
+![Diffusion algorithm visualization. The point cloud represents a hollow object with inter surface points (red) and outer surface points (black). Purple balls marked 0, 1, 2, and 3 represent the initial spawn point, reflected point, free-moving point, and escape point, respectively. The gray dashed sphere is the escape boundary sphere centered at the initial spawn point (0).](images/DiffusionAlgorithm.png)
