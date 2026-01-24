@@ -53,17 +53,14 @@ $$R_{outer} = \frac{C_{outer}}{N_{outer}},$$ where $N_{outer}$ is the
 total number of outer layer points. Ideally, $R_{outer} = 0$ when no
 outer layer points are detected.
 
-## Performance in Watertight 3D Model {#sec:performance_watertight}
+## Performance in Watertight 3D Model
 
 In this simulation of a watertight double layer ball 3D mode, we set the
 $R_{ball}=4R_0$, $collision \; margin=0.5 R_{ball}$,
 $R_{eff} = 1.5 R_{ball}$, and $L_{max}=50R_0$, $p=0.999$, also limit
-number of steps to 50 and the collisions limit as 5. And the metrics are
-shown in
-Figure [\[fig:performance\]](#fig:performance){reference-type="ref"
-reference="fig:performance"} for $R_{dup}$ vs step $i$ and
+number of steps to 50 and the collisions limit as 5. And the metrics for $R_{dup}$ vs step $i$ and
 $R_{inter}, R{outer}$ vs step $i$.
-
+![](images/Ballsize2.png)
 To quantify the performance of our diffusion-driven algorithm in
 identifying inter surfaces of non-watertight point clouds, we define
 $R_{\text{inter}}(i)$ as the proportion of correctly identified inter
