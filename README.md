@@ -102,9 +102,8 @@ core) running at a maximum clock speed of 6.0 GHz. Tests were conducted
 across varying numbers of CPU processors, measuring both the time
 consumed and the processing rate in balls per second. The results,
 summarized in
-Table [\[tab:parallel_performance\]](#tab:parallel_performance){reference-type="ref"
-reference="tab:parallel_performance"}, demonstrate significant
+The following table demonstrate significant
 improvements in computational speed with increased processor counts,
 although diminishing returns are observed at higher processor numbers,
 likely due to overhead in thread management or resource contention.
-
+![Parallel calculation table](images/ParallelCal.png)
