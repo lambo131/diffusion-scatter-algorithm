@@ -34,7 +34,7 @@ Repository: https://github.com/lambo131/diffusion-scatter-algorithm
 
 ---
 
-## Serial Run (recommended)
+## Serial Run
 
 ### 1) Edit the configuration in `Serial/main.py`
 
