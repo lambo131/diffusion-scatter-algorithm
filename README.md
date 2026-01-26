@@ -53,6 +53,30 @@ config_1 = {
     'p': 0.98,
     'diffusion': True
 }
+```
+### Configuration Notes
 
+In this configuration:
 
+- **`ply_file`**: Path to the input `.ply` point cloud file.
+- **`origin_point`**: The **initial spawn point** (user-defined).
+- **`render`**:
+  - `False` disables the rendering process
+  - `True` enables visualization
+- **`num_balls`**: Maximum number of simulation balls (i.e., maximum number of simulation iterations).
+- **`max_steps`** (default: `50`): Per-ball step limit.
+- **`max_collisions`** (default: `5`): Per-ball collision limit.
+- **`ball_radius_factor`**: Sets the simulation ball radius as a multiple of the point-cloud base length scale (e.g., the average nearest-neighbor distance, consistent with the paper’s unit-length definition).
+- **`p`**: Controls spawn-point selection:
+  - with probability `p`, sample from the dynamically generated spawn-point pool
+  - with probability `1-p`, restart from `origin_point`
+- **`diffusion`**: `True` enables diffusion-driven mode (with dynamic spawn-point generation).
+
+---
+
+### Step 2 — Run From the repository root:
+
+```bash
+python Serial/main.py
+```
 
