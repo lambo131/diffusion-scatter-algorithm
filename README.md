@@ -79,4 +79,57 @@ In this configuration:
 ```bash
 python Serial/main.py
 ```
+---
+
+## Parallel Run
+
+### 1) Edit the configuration in `example_parallel_usage_with_output.py`
+
+To run the parallel version, edit the `config` dictionary in `example_parallel_usage_with_output.py`. Example:
+
+```python
+config = {
+    'ply_file': './ply_files/test ply inputs/ball',
+    'origin_point': [0, 0, 0],
+    'ball_radius_factor': 4,
+    'num_balls': 50000,
+    'max_steps': 50,
+    'max_collisions': 5,
+    'diffusion': True,
+    'render': False,  # Must be False for parallel mode
+    'num_processes': 8,  # Number of CPU cores (None for auto-detect)
+}
+```
+
+### Configuration Notes
+
+In this configuration:
+
+- **`ply_file`**: Path to the input `.ply` point cloud file (without extension).
+- **`origin_point`**: The **initial spawn point** (user-defined).
+- **`ball_radius_factor`**: Sets the simulation ball radius as a multiple of the point-cloud base length scale.
+- **`num_balls`**: Maximum number of simulation balls.
+- **`max_steps`** (default: `50`): Per-ball step limit.
+- **`max_collisions`** (default: `5`): Per-ball collision limit.
+- **`diffusion`**: `True` enables diffusion-driven mode (with dynamic spawn-point generation).
+- **`render`**: **Must be `False`** for parallel mode (Open3D visualization is not multiprocessing-safe).
+- **`num_processes`**: Number of parallel processes to use. Set to `None` for automatic detection (recommended), or specify a number (e.g., `8` for 8 CPU cores).
+
+### Additional Parallel-Specific Notes
+
+- **Memory usage**: Each process loads its own copy of the point cloud. For large point clouds, consider reducing `num_processes` if memory is limited.
+- **Performance**: Parallel execution typically provides 2-8x speedup depending on CPU cores and workload.
+- **Output files**: Results are saved to `ply_files/output/` directory:
+  - `output_<simulation_name>.ply` — detected inter surface points
+  - `all_collisions_<simulation_name>.ply` — all collision points
+  - `spawn_points_<simulation_name>.ply` — spawn point locations
+  - `ply_files/sim_data/sim_data_<simulation_name>.pkl` — complete simulation data
+
+---
+
+### Step 2 — Run From the repository root:
+
+```bash
+python example_parallel_usage_with_output.py
+```
 
