@@ -3,7 +3,7 @@
 
 ![Diffusion-based interlayer point cloud reconstruction method.](images/pipeline5.png)
 # Diffusion-Driven Inter–Outer Surface Separation for Non-Watertight Point Clouds
-
+The paper is preprinted on https://arxiv.org/abs/2602.00739
 This repository implements a **diffusion-driven** (physics-inspired) algorithm to separate **inter surface points** and **outer surface points** from **double-layered point clouds**, including **non-watertight** (open) geometries. The core idea is to simulate **particle diffusion via random walks** inside a hollow point-cloud shell using a moving **simulation ball**, and to log **collided cloud points** to recover the **true inter layer**.
 
 Repository: https://github.com/lambo131/diffusion-scatter-algorithm
